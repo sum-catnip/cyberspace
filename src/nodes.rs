@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt, marker::PhantomData};
 
 use bevy::prelude::*;
-use hexx::Hex;
+use hexx::{EdgeDirection, Hex};
 
 use crate::Map;
 
@@ -23,7 +23,7 @@ pub struct PortMeta {
 
 // links to metaport
 #[derive(Component, Default)]
-pub struct PortCfg(pub HashMap<Hex, Entity>);
+pub struct PortCfg(pub HashMap<EdgeDirection, Entity>);
 
 #[derive(Component, Clone)]
 pub struct PortMetas(pub Vec<Entity>);
