@@ -1,13 +1,12 @@
 use bevy::{
     color::palettes::css::{BLUE, GREEN, RED},
     prelude::*,
-    sprite::MaterialMesh2dBundle,
 };
 use hexx::{algorithms, Hex};
 use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
-    nodes::{HexPos, TargetableEntity},
+    nodes::{Health, HexPos, TargetableEntity},
     Gamestate, Map, Tick, TileType,
 };
 
@@ -16,7 +15,7 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_res).add_systems(
             Update,
-            (spawner, follow_path, draw_path).run_if(in_state(Gamestate::Game)),
+            (spawner, follow_path, draw_path, despawn).run_if(in_state(Gamestate::Game)),
         );
     }
 }
@@ -37,6 +36,7 @@ struct EnemyBundle {
     path: PathfindPath,
     activity: EnemyActivity,
     targetable: TargetableEntity,
+    health: Health,
 }
 
 #[derive(Component, Default, PartialEq)]
@@ -122,7 +122,7 @@ fn spawner(
         };
 
         let mut rng = rand::thread_rng();
-        let spawntile = heart.0.ring(8).choose(&mut rng).unwrap();
+        let spawntile = heart.0.ring(15).choose(&mut rng).unwrap();
         let spawnpos = map.layout.hex_to_world_pos(spawntile);
         let Some(path) = algorithms::a_star(spawntile, heart.0, |_, h2| {
             let Some(e2) = map.storage.get(h2) else {
@@ -150,6 +150,15 @@ fn spawner(
             path: PathfindPath { path, i: 0 },
             activity: EnemyActivity::default(),
             targetable: TargetableEntity,
+            health: Health(42.),
         });
+    }
+}
+
+fn despawn(mut cmd: Commands, hp: Query<(Entity, &Health)>) {
+    for (e, hp) in hp.iter() {
+        if hp.0 <= 0. {
+            cmd.entity(e).despawn_recursive();
+        }
     }
 }

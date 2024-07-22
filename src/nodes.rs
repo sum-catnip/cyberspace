@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt, marker::PhantomData};
 use bevy::prelude::*;
 use hexx::{EdgeDirection, Hex};
 
-use crate::Map;
+use crate::{Map, TileType};
 
 #[derive(Component, Clone)]
 pub struct Name(pub String);
@@ -38,6 +38,7 @@ pub enum ValType {
 
 #[derive(Clone, PartialEq)]
 pub enum Val {
+    Empty,
     Entity(Entity),
     Vec(Vec2),
     Number(f64),
@@ -48,7 +49,7 @@ pub enum Val {
 pub struct TargetableEntity;
 
 #[derive(Component)]
-pub struct Health(f64);
+pub struct Health(pub f64);
 
 #[derive(Component)]
 pub struct MetaLink(pub Entity);
@@ -158,9 +159,61 @@ impl Plugin for CyberPlugin {
     }
 }
 
-fn lazor_tick(mut evt: EventReader<TickNode<Lazor>>) {
-    for _ in evt.read() {
+fn port_by_name(
+    name: &str,
+    pos: Hex,
+    map: &Map,
+    cfg: &PortCfg,
+    meta: &Query<&PortMeta>,
+    tiles: &Query<&TileType>,
+) -> Entity {
+    *cfg.0
+        .iter()
+        .find_map(|(h, e)| (meta.get(*e).unwrap().name == name).then_some(h))
+        .map(|h| match tiles.get(map.fetch_panic(pos + *h)).unwrap() {
+            TileType::CyberNode { e, .. } => e,
+            _ => unreachable!(),
+        })
+        .unwrap()
+}
+
+fn lazor_tick(
+    mut evt: EventReader<TickNode<Lazor>>,
+    map: Res<Map>,
+    node: Query<(&HexPos, &PortCfg)>,
+    tiles: Query<&TileType>,
+    mut state: Query<&mut CyberState>,
+    metas: Query<&PortMeta>,
+    mut targets: Query<&mut Health, With<TargetableEntity>>,
+) {
+    const DMG: f64 = 10.;
+    for e in evt.read() {
         info!("ticking lazor");
+        let Ok((pos, cfg)) = node.get(e.e) else {
+            return;
+        };
+
+        let target = port_by_name("target", pos.0, &map, cfg, &metas, &tiles);
+        let Ok(target_state) = state.get(target) else {
+            warn!("port tile no longer exists");
+            continue;
+        };
+
+        let CyberState::Done(Ok(Val::Entity(target))) = *target_state else {
+            warn!("port tile changed state unexpectedly, or has invalid type");
+            continue;
+        };
+
+        let mut state = state.get_mut(e.e).unwrap();
+        let Ok(mut hp) = targets.get_mut(target) else {
+            // entity no longer exists
+            warn!("tried to lazor entity that no longer exists or has no health");
+            *state = CyberState::Done(Err(()));
+            continue;
+        };
+
+        hp.0 -= DMG;
+        *state = CyberState::Idle;
     }
 }
 
@@ -168,15 +221,15 @@ fn closest_tick(
     map: Res<Map>,
     mut evt: EventReader<TickNode<ClosestEntity>>,
     mut state: Query<(&mut CyberState, &HexPos)>,
-    targets: Query<(Entity, &Transform, &TargetableEntity)>,
+    targets: Query<(Entity, &Transform), With<TargetableEntity>>,
 ) {
     for tick in evt.read() {
         info!("ticking get closest entity");
         let (mut state, hpos) = state.get_mut(tick.e).unwrap();
-        let e = targets.iter().find_map(|(e, trans, _)| {
+        let e = targets.iter().find_map(|(e, trans)| {
             let pos = map.layout.hex_to_world_pos(hpos.0);
             let dist = (trans.translation.xy() - pos).length();
-            (dist > 100.).then_some(e)
+            (dist <= 25.).then_some(e)
         });
 
         *state = match e {

@@ -58,7 +58,7 @@ fn grid_pick(
             continue;
         };
 
-        let tile_hex = Hex::ZERO.neighbor_direction(tile_hex).unwrap();
+        let tile_hex = tile_hex.neighbor_direction(Hex::ZERO).unwrap();
 
         let mut cfg = portcfg.get_mut(grid.0).expect("node without portcfg");
         if let Some(h) = cfg.0.iter().find(|(_, e)| **e == meta.0).map(|(h, _)| *h) {

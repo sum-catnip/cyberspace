@@ -14,7 +14,7 @@ use shop::PickedItem;
 use ui::UIPlugin;
 
 use bevy::{
-    color::palettes::css::RED,
+    color::palettes::css::{GREEN, RED},
     prelude::*,
     render::{
         mesh::{Indices, PrimitiveTopology},
