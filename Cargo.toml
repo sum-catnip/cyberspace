@@ -1,0 +1,21 @@
+[package]
+name = "cyberspace"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.14.0", features = ["bevy_dev_tools", "dynamic_linking", "file_watcher", "subpixel_glyph_atlas", "wayland"] }
+bevy-inspector-egui = "0.25.1"
+bevy_egui = "0.28.0"
+hexx = { git = "https://github.com/ManevilleF/hexx.git", version = "0.17.0" }
+rand = "0.8.5"
+
+# Enable a small amount of optimization in the dev profile.
+[profile.dev]
+opt-level = 1
+
+# Enable a large amount of optimization in the dev profile for dependencies.
+[profile.dev.package."*"]
+opt-level = 3
