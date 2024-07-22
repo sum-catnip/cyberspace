@@ -19,11 +19,15 @@ pub struct PortMeta {
     pub name: String,
     pub desc: String,
     pub vt: ValType,
+    pub constant: bool,
 }
 
 // links to metaport
 #[derive(Component, Default)]
-pub struct PortCfg(pub HashMap<EdgeDirection, Entity>);
+pub struct PortCfg {
+    pub inputs: HashMap<EdgeDirection, Entity>,
+    pub constant: Option<Val>,
+}
 
 #[derive(Component, Clone)]
 pub struct PortMetas(pub Vec<Entity>);
@@ -34,6 +38,7 @@ pub enum ValType {
     Vec,
     Number,
     Text,
+    List,
 }
 
 #[derive(Clone, PartialEq)]
@@ -43,6 +48,7 @@ pub enum Val {
     Vec(Vec2),
     Number(f64),
     Text(String),
+    List(Vec<Val>),
 }
 
 #[derive(Component)]
@@ -83,7 +89,7 @@ pub struct ItemMetaBundle {
     pub tex: Handle<Image>,
     pub mat: Handle<ColorMaterial>,
     pub ports: PortMetas,
-    pub outputs: OutputPort,
+    pub output: OutputPort,
     pub node: CyberNodes,
     meta: ItemMeta,
 }
@@ -95,8 +101,13 @@ impl fmt::Display for ValType {
 }
 
 impl PortMeta {
-    pub fn new_meta(name: String, desc: String, t: ValType) -> Self {
-        Self { name, desc, vt: t }
+    pub fn new_meta(name: String, desc: String, t: ValType, constant: bool) -> Self {
+        Self {
+            name,
+            desc,
+            vt: t,
+            constant,
+        }
     }
 }
 
@@ -116,7 +127,7 @@ impl ItemMetaBundle {
             mat,
             tex,
             ports: PortMetas(ports.to_vec()),
-            outputs: OutputPort(outputs),
+            output: OutputPort(outputs),
             meta: ItemMeta,
             node,
         }
@@ -167,7 +178,7 @@ fn port_by_name(
     meta: &Query<&PortMeta>,
     tiles: &Query<&TileType>,
 ) -> Entity {
-    *cfg.0
+    *cfg.inputs
         .iter()
         .find_map(|(h, e)| (meta.get(*e).unwrap().name == name).then_some(h))
         .map(|h| match tiles.get(map.fetch_panic(pos + *h)).unwrap() {

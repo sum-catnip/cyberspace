@@ -1,10 +1,12 @@
 use core::panic;
 
-use bevy::{color::palettes::css::BLACK, math::vec2, prelude::*, ui::RelativeCursorPosition};
+use bevy::{
+    color::palettes::css::BLACK, math::vec2, prelude::*, ui::RelativeCursorPosition, utils::warn,
+};
 use hexx::{storage::HexagonalMap, Hex, HexLayout};
 
 use crate::{
-    nodes::{PortCfg, PortMeta, PortMetas},
+    nodes::{OutputPort, PortCfg, PortMeta, PortMetas},
     ui::UIRoot,
     CommonResources, ConfiguringTile, Gamestate, Map, TileType,
 };
@@ -39,6 +41,9 @@ struct GridSelection {
     ui: Option<Entity>,
 }
 
+#[derive(Component)]
+struct ConstantValue(Entity);
+
 fn grid_pick(
     input: Res<ButtonInput<MouseButton>>,
     grids: Query<(&CfgGrid, &GridSelection, &GridTiles, &GridMeta)>,
@@ -61,16 +66,21 @@ fn grid_pick(
         let tile_hex = tile_hex.neighbor_direction(Hex::ZERO).unwrap();
 
         let mut cfg = portcfg.get_mut(grid.0).expect("node without portcfg");
-        if let Some(h) = cfg.0.iter().find(|(_, e)| **e == meta.0).map(|(h, _)| *h) {
+        if let Some(h) = cfg
+            .inputs
+            .iter()
+            .find(|(_, e)| **e == meta.0)
+            .map(|(h, _)| *h)
+        {
             // this metaport has already been asigned to to another tile
-            cfg.0.remove(&h);
+            cfg.inputs.remove(&h);
         }
 
-        if cfg.0.get(&tile_hex).is_some() {
+        if cfg.inputs.get(&tile_hex).is_some() {
             warn!("tile already taken");
             continue;
         }
-        cfg.0.insert(tile_hex, meta.0);
+        cfg.inputs.insert(tile_hex, meta.0);
 
         // lets reset all tiles lol
         for e in tiles.0.iter().flatten().copied() {
@@ -115,7 +125,66 @@ fn grid_select(
     }
 }
 
-fn spawn_row(
+fn spawn_output_row(
+    cmd: &mut Commands,
+    metas: &Query<&PortMeta>,
+    cfg: &PortCfg,
+    meta_ent: Entity,
+    node: Entity,
+) -> Entity {
+    let meta = metas.get(meta_ent).unwrap();
+
+    cmd.spawn(NodeBundle {
+        style: Style {
+            display: Display::Flex,
+            flex_direction: FlexDirection::Row,
+            ..default()
+        },
+        ..default()
+    })
+    .with_children(|row| {
+        // left side (text)
+        row.spawn(NodeBundle {
+            style: Style {
+                display: Display::Flex,
+                flex_direction: FlexDirection::Column,
+                ..default()
+            },
+            ..default()
+        })
+        .with_children(|ui| {
+            ui.spawn(TextBundle::from_section(
+                meta.name.clone(),
+                TextStyle::default(),
+            ));
+            ui.spawn(TextBundle::from_section(
+                meta.desc.clone(),
+                TextStyle::default(),
+            ));
+            ui.spawn(TextBundle::from_section(
+                meta.vt.to_string(),
+                TextStyle::default(),
+            ));
+        });
+
+        // right side (maybe constant)
+        if meta.constant {
+            let v = match &cfg.constant {
+                Some(crate::nodes::Val::Text(t)) => t.clone(),
+                Some(crate::nodes::Val::Number(n)) => n.to_string(),
+                Some(_) => unreachable!(),
+                None => "use the keyboard :)".to_string(),
+            };
+            row.spawn((
+                TextBundle::from_section(v, TextStyle::default()),
+                ConstantValue(node),
+            ));
+        }
+    })
+    .id()
+}
+
+fn spawn_input_row(
     cmd: &mut Commands,
     metas: &Query<&PortMeta>,
     meta_ent: Entity,
@@ -208,8 +277,9 @@ fn build_ui(
     tile: Res<ConfiguringTile>,
     map: Res<Map>,
     tts: Query<&TileType>,
-    ports: Query<&PortMetas>,
+    ports: Query<(&PortMetas, &OutputPort)>,
     metas: Query<&PortMeta>,
+    cfg: Query<&PortCfg>,
     res: Res<CommonResources>,
 ) {
     let tt = tts.get(map.fetch_panic(tile.0.unwrap())).unwrap();
@@ -217,13 +287,14 @@ fn build_ui(
         panic!("configuration open for non cybernode");
     };
     let node = e;
+    let cfg = cfg.get(e).unwrap();
 
     let layout = HexLayout {
         hex_size: Vec2::splat(20.),
         ..default()
     };
 
-    let ports = ports.get(meta).expect("cybernode with no meta");
+    let (inputs, output) = ports.get(meta).expect("cybernode with no meta");
 
     let in_text = cmd
         .spawn(TextBundle::from_section(
@@ -231,11 +302,18 @@ fn build_ui(
             TextStyle::default(),
         ))
         .id();
-    let in_rows: Vec<Entity> = ports
+    let in_rows: Vec<Entity> = inputs
         .0
         .iter()
-        .map(|e| spawn_row(&mut cmd, &metas, *e, &res, node, &layout))
+        .map(|e| spawn_input_row(&mut cmd, &metas, *e, &res, node, &layout))
         .collect();
+    let out_text = cmd
+        .spawn(TextBundle::from_section(
+            "output port".to_string(),
+            TextStyle::default(),
+        ))
+        .id();
+    //let out = spawn_output_row(&mut cmd, &metas, cfg, meta_ent, node)
 
     let ui = cmd
         .spawn((

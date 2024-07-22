@@ -98,6 +98,7 @@ fn spawn_shop(
             "target".to_string(),
             "the target entity to shoot".to_string(),
             ValType::Entity,
+            false,
         ))
         .id();
 
@@ -107,6 +108,7 @@ fn spawn_shop(
             "closest".to_string(),
             "the closest nearby entity".to_string(),
             ValType::Entity,
+            false,
         ))
         .id();
 
