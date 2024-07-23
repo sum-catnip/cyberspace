@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use enemy::EnemyPlugin;
 use nodes::{
-    ClosestEntity, CyberNodes, CyberPlugin, CyberState, HexPos, Lazor, MetaLink, NodeBundle,
-    PortCfg, PortMetas, TickNode,
+    ClosestEntity, ConstantNumber, CyberNodes, CyberPlugin, CyberState, HexPos, Lazor, MetaLink,
+    NodeBundle, PortCfg, PortMetas, TickNode,
 };
 use shop::PickedItem;
 use ui::UIPlugin;
@@ -257,13 +257,13 @@ fn tick_nodes(
         .filter(|(_, s, ..)| **s == CyberState::ActivationRequest)
     {
         let (portmeta, node) = metas.get(ml.0).unwrap();
-        if portmeta.0.len() != cfg.0.len() {
+        if portmeta.0.len() != cfg.inputs.len() {
             // not all ports are set
             continue;
         };
 
         // check if all port nodes are satisfied
-        let satisfied = cfg.0.iter().all(|(ph, _)| {
+        let satisfied = cfg.inputs.iter().all(|(ph, _)| {
             let Some(tile) = map.storage.get(hex.0 + *ph) else {
                 return false;
             };
@@ -271,7 +271,10 @@ fn tick_nodes(
             let TileType::CyberNode { e, .. } = tiles.get(*tile).unwrap() else {
                 return false;
             };
-            let (_, s, ..) = nodes.get(*e).unwrap();
+            let Ok((_, s, ..)) = nodes.get(*e) else {
+                // not spawned yet
+                return false;
+            };
             matches!(*s, CyberState::Done(Ok(..)))
         });
 
@@ -283,6 +286,9 @@ fn tick_nodes(
                     CyberNodes::Lazor => drop(world.send_event(TickNode::<Lazor>::new(e))),
                     CyberNodes::ClosestEntity => {
                         world.send_event(TickNode::<ClosestEntity>::new(e));
+                    }
+                    CyberNodes::ConstantNumber => {
+                        world.send_event(TickNode::<ConstantNumber>::new(e));
                     }
                 };
             });

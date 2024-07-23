@@ -34,6 +34,7 @@ pub struct PortMetas(pub Vec<Entity>);
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ValType {
+    Empty,
     Entity,
     Vec,
     Number,
@@ -80,7 +81,7 @@ pub struct NodeBundle {
 }
 
 #[derive(Component, Clone, Copy)]
-pub struct OutputPort(Option<Entity>);
+pub struct OutputPort(pub Entity);
 
 #[derive(Bundle, Clone)]
 pub struct ItemMetaBundle {
@@ -116,15 +117,15 @@ impl ItemMetaBundle {
         name: String,
         desc: String,
         ports: &[Entity],
-        outputs: Option<Entity>,
+        outputs: Entity,
         tex: Handle<Image>,
-        mat: Handle<ColorMaterial>,
         node: CyberNodes,
+        mats: &mut Assets<ColorMaterial>,
     ) -> Self {
         Self {
             name: Name(name),
             desc: Description(desc),
-            mat,
+            mat: mats.add(tex.clone()),
             tex,
             ports: PortMetas(ports.to_vec()),
             output: OutputPort(outputs),
@@ -139,6 +140,7 @@ pub enum CyberNodes {
     WIP,
     Lazor,
     ClosestEntity,
+    ConstantNumber,
 }
 
 #[derive(Event)]
@@ -160,12 +162,15 @@ impl<T> TickNode<T> {
 pub struct Lazor;
 #[derive(Default)]
 pub struct ClosestEntity;
+#[derive(Default)]
+pub struct ConstantNumber;
 
 pub struct CyberPlugin;
 impl Plugin for CyberPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<TickNode<Lazor>>()
             .add_event::<TickNode<ClosestEntity>>()
+            .add_event::<TickNode<ConstantNumber>>()
             .add_systems(Update, (lazor_tick, closest_tick));
     }
 }

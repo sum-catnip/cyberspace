@@ -1,12 +1,21 @@
 use core::panic;
+use std::f64::NAN;
 
 use bevy::{
-    color::palettes::css::BLACK, math::vec2, prelude::*, ui::RelativeCursorPosition, utils::warn,
+    color::palettes::css::BLACK,
+    input::{
+        keyboard::{Key, KeyboardInput},
+        ButtonState,
+    },
+    math::vec2,
+    prelude::*,
+    ui::RelativeCursorPosition,
+    utils::warn,
 };
 use hexx::{storage::HexagonalMap, Hex, HexLayout};
 
 use crate::{
-    nodes::{OutputPort, PortCfg, PortMeta, PortMetas},
+    nodes::{MetaLink, OutputPort, PortCfg, PortMeta, PortMetas, Val as CyberVal, ValType},
     ui::UIRoot,
     CommonResources, ConfiguringTile, Gamestate, Map, TileType,
 };
@@ -18,7 +27,8 @@ impl Plugin for ConfiguratePlugin {
             .add_systems(OnExit(Gamestate::Configurate), destroy_ui)
             .add_systems(
                 Update,
-                (esc_to_exit, grid_select, grid_pick).run_if(in_state(Gamestate::Configurate)),
+                (esc_to_exit, grid_select, grid_pick, update_constant)
+                    .run_if(in_state(Gamestate::Configurate)),
             );
     }
 }
@@ -178,6 +188,7 @@ fn spawn_output_row(
             row.spawn((
                 TextBundle::from_section(v, TextStyle::default()),
                 ConstantValue(node),
+                MetaLink(meta_ent),
             ));
         }
     })
@@ -271,6 +282,58 @@ fn spawn_input_row(
     .id()
 }
 
+fn update_constant(
+    mut input: EventReader<KeyboardInput>,
+    mut text: Query<(&mut Text, &ConstantValue, &MetaLink)>,
+    meta: Query<&PortMeta>,
+    mut cfg: Query<&mut PortCfg>,
+) {
+    let Ok((mut text, constant, metae)) = text.get_single_mut() else {
+        return;
+    };
+    let vt = meta.get(metae.0).unwrap().vt;
+    let mut cfg = cfg.get_mut(constant.0).unwrap();
+
+    for evt in input.read() {
+        if evt.state != ButtonState::Pressed {
+            continue;
+        }
+
+        if cfg.constant.is_none() {
+            text.sections[0].value = "".to_string();
+        }
+
+        if let Key::Character(c) = &evt.logical_key {
+            text.sections[0].value.push_str(c);
+        }
+        if let Key::Backspace = &evt.logical_key {
+            if text.sections[0].value == "NaN" {
+                text.sections[0].value.clear();
+            } else {
+                text.sections[0].value.pop();
+            }
+        }
+
+        let new = match vt {
+            ValType::Number => {
+                let mut v = 0.;
+                if !text.sections[0].value.is_empty() {
+                    v = text.sections[0].value.parse::<f64>().unwrap_or(NAN);
+                    if v.is_nan() {
+                        text.sections[0].value = "NaN".to_string();
+                    }
+                };
+
+                CyberVal::Number(v)
+            }
+            ValType::Text => CyberVal::Text(text.sections[0].value.clone()),
+            _ => unreachable!(),
+        };
+
+        cfg.constant = Some(new);
+    }
+}
+
 fn build_ui(
     mut cmd: Commands,
     root: Res<UIRoot>,
@@ -313,6 +376,7 @@ fn build_ui(
             TextStyle::default(),
         ))
         .id();
+    let out_row = spawn_output_row(&mut cmd, &metas, cfg, output.0, node);
     //let out = spawn_output_row(&mut cmd, &metas, cfg, meta_ent, node)
 
     let ui = cmd
@@ -332,6 +396,8 @@ fn build_ui(
         ))
         .add_child(in_text)
         .push_children(&in_rows)
+        .add_child(out_text)
+        .add_child(out_row)
         .id();
 
     cmd.entity(root.0).add_child(ui);

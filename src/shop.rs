@@ -91,23 +91,11 @@ fn spawn_shop(
         ..default()
     };
 
-    let lazortex = ass.load("nodes/lazor.png");
-
-    let lazor_in = cmd
+    let empty_out = cmd
         .spawn(PortMeta::new_meta(
-            "target".to_string(),
-            "the target entity to shoot".to_string(),
-            ValType::Entity,
-            false,
-        ))
-        .id();
-
-    let closesttex = ass.load("nodes/closest.png");
-    let closest_out = cmd
-        .spawn(PortMeta::new_meta(
-            "closest".to_string(),
-            "the closest nearby entity".to_string(),
-            ValType::Entity,
+            "nothing".to_string(),
+            "nothing".to_string(),
+            ValType::Empty,
             false,
         ))
         .id();
@@ -116,20 +104,48 @@ fn spawn_shop(
         ItemMetaBundle::new(
             "lazor".to_string(),
             "shoots lazor beam at target".to_string(),
-            &[lazor_in],
-            None,
-            lazortex.clone(),
-            mats.add(lazortex),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "target".to_string(),
+                    "the target entity to shoot".to_string(),
+                    ValType::Entity,
+                    false,
+                ))
+                .id()],
+            empty_out,
+            ass.load("nodes/lazor.png"),
             CyberNodes::Lazor,
+            &mut mats,
         ),
         ItemMetaBundle::new(
             "closest".to_string(),
             "returns the closest nearby entity".to_string(),
             &[],
-            Some(closest_out),
-            closesttex.clone(),
-            mats.add(closesttex),
+            cmd.spawn(PortMeta::new_meta(
+                "closest".to_string(),
+                "the closest nearby entity".to_string(),
+                ValType::Entity,
+                false,
+            ))
+            .id(),
+            ass.load("nodes/closest.png"),
             CyberNodes::ClosestEntity,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "constant number".to_string(),
+            "returns a constant number set in the port config".to_string(),
+            &[],
+            cmd.spawn(PortMeta::new_meta(
+                "constant".to_string(),
+                "the constant value".to_string(),
+                ValType::Number,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/port_in.png"),
+            CyberNodes::ConstantNumber,
+            &mut mats,
         ),
     ]
     .into_iter();
@@ -139,10 +155,10 @@ fn spawn_shop(
         "empty slot".to_string(),
         "wip".to_string(),
         &[],
-        None,
+        empty_out,
         emptyimg.clone(),
-        mats.add(emptyimg),
         CyberNodes::WIP,
+        &mut mats,
     );
 
     let storage = HexagonalMap::new(Hex::ZERO, 5, |_| {
