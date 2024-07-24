@@ -7,14 +7,17 @@ use std::time::Duration;
 
 use enemy::EnemyPlugin;
 use nodes::{
-    ClosestEntity, ConstantNumber, CyberNodes, CyberPlugin, CyberState, HexPos, Lazor, MetaLink,
-    NodeBundle, PortCfg, PortMetas, TickNode,
+    ClosestEntity, ConstantNumber, CyberNodes, CyberPlugin, CyberState, EntityDirection, EntityPos,
+    HexPos, Lazor, List, MetaLink, NearbyEntity, NodeBundle, NumberMul, NumberSub, Orbital, Plasma,
+    PortCfg, PortMetas, Project, RocketLauncher, Shock, TickNode, Vector, VectorLen, VectorMul,
+    VectorNeg,
 };
 use shop::PickedItem;
 use ui::UIPlugin;
 
 use bevy::{
     color::palettes::css::{GREEN, RED},
+    core_pipeline::bloom::BloomSettings,
     prelude::*,
     render::{
         mesh::{Indices, PrimitiveTopology},
@@ -58,7 +61,7 @@ fn main() {
         .run();
 }
 
-const HEX_SIZE: Vec2 = Vec2::splat(15.);
+const HEX_SIZE: Vec2 = Vec2::splat(25.);
 
 #[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash, Reflect)]
 enum Gamestate {
@@ -167,7 +170,22 @@ fn setup(
     mut mat: ResMut<Assets<ColorMaterial>>,
     ass: Res<AssetServer>,
 ) {
-    cmd.spawn((Camera2dBundle::default(), MainCamera, IsDefaultUiCamera));
+    cmd.spawn((
+        Camera2dBundle {
+            camera: Camera {
+                hdr: true,
+                ..default()
+            },
+            tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
+            ..default()
+        },
+        BloomSettings {
+            intensity: 0.5,
+            ..default()
+        },
+        MainCamera,
+        IsDefaultUiCamera,
+    ));
 
     let layout = HexLayout {
         hex_size: HEX_SIZE,
@@ -250,17 +268,13 @@ fn tick_nodes(
     map: Res<Map>,
     tiles: Query<&TileType>,
     nodes: Query<(Entity, &CyberState, &PortCfg, &MetaLink, &HexPos)>,
-    metas: Query<(&PortMetas, &CyberNodes)>,
+    metas: Query<&CyberNodes>,
 ) {
     for (e, _, cfg, ml, hex) in nodes
         .iter()
         .filter(|(_, s, ..)| **s == CyberState::ActivationRequest)
     {
-        let (portmeta, node) = metas.get(ml.0).unwrap();
-        if portmeta.0.len() != cfg.inputs.len() {
-            // not all ports are set
-            continue;
-        };
+        let node = metas.get(ml.0).unwrap();
 
         // check if all port nodes are satisfied
         let satisfied = cfg.inputs.iter().all(|(ph, _)| {
@@ -289,6 +303,51 @@ fn tick_nodes(
                     }
                     CyberNodes::ConstantNumber => {
                         world.send_event(TickNode::<ConstantNumber>::new(e));
+                    }
+                    CyberNodes::List => {
+                        world.send_event(TickNode::<List>::new(e));
+                    }
+                    CyberNodes::EntityPos => {
+                        world.send_event(TickNode::<EntityPos>::new(e));
+                    }
+                    CyberNodes::EntityDirection => {
+                        world.send_event(TickNode::<EntityDirection>::new(e));
+                    }
+                    CyberNodes::NearbyEntities => {
+                        world.send_event(TickNode::<NearbyEntity>::new(e));
+                    }
+                    CyberNodes::VectorLen => {
+                        world.send_event(TickNode::<VectorLen>::new(e));
+                    }
+                    CyberNodes::VectorNeg => {
+                        world.send_event(TickNode::<VectorNeg>::new(e));
+                    }
+                    CyberNodes::NumberSub => {
+                        world.send_event(TickNode::<NumberSub>::new(e));
+                    }
+                    CyberNodes::NumberMul => {
+                        world.send_event(TickNode::<NumberMul>::new(e));
+                    }
+                    CyberNodes::VectorMul => {
+                        world.send_event(TickNode::<VectorMul>::new(e));
+                    }
+                    CyberNodes::Project => {
+                        world.send_event(TickNode::<Project>::new(e));
+                    }
+                    CyberNodes::Shock => {
+                        world.send_event(TickNode::<Shock>::new(e));
+                    }
+                    CyberNodes::Plasma => {
+                        world.send_event(TickNode::<Plasma>::new(e));
+                    }
+                    CyberNodes::Orbital => {
+                        world.send_event(TickNode::<Orbital>::new(e));
+                    }
+                    CyberNodes::RocketLauncher => {
+                        world.send_event(TickNode::<RocketLauncher>::new(e));
+                    }
+                    CyberNodes::Vector => {
+                        world.send_event(TickNode::<Vector>::new(e));
                     }
                 };
             });

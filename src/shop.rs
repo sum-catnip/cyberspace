@@ -118,7 +118,156 @@ fn spawn_shop(
             &mut mats,
         ),
         ItemMetaBundle::new(
-            "closest".to_string(),
+            "rocket launcher".to_string(),
+            "shoots rockets in the target direction".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "direction".to_string(),
+                    "the direction to shoot in".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id()],
+            empty_out,
+            ass.load("nodes/launcher.png"),
+            CyberNodes::RocketLauncher,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "orbital strike".to_string(),
+            "request an orbital strike at a position that will arrive in the future".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "target".to_string(),
+                    "the target position".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id()],
+            empty_out,
+            ass.load("nodes/orbital.png"),
+            CyberNodes::Orbital,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "plasma cannon".to_string(),
+            "shoot a plasma to the target position. the size of the plasma depends on how many ticks the plasma cannon has been charged".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "target".to_string(),
+                    "the target position".to_string(),
+                    ValType::Vec,
+                    false,
+                )).id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "threshold".to_string(),
+                    "the amount of ticks to collect before firing. default is max: 10".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "fired".to_string(),
+                "power of the shot or 0 if it didnt fire this tick".to_string(),
+                ValType::Number,
+                false,
+            ))
+            .id(),
+            ass.load("nodes/plasma.png"),
+            CyberNodes::Plasma,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "tesla coil".to_string(),
+            "shoot lightning at all targets".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "targets".to_string(),
+                    "list of target entities".to_string(),
+                    ValType::List,
+                    false,
+                )).id(),
+                ],
+            cmd.spawn(PortMeta::new_meta(
+                "shot".to_string(),
+                "number of targets shot".to_string(),
+                ValType::Number,
+                false,
+            ))
+            .id(),
+            ass.load("nodes/shock.png"),
+            CyberNodes::Shock,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "project tile".to_string(),
+            "project an illusory tile at the target position".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "target".to_string(),
+                    "target position".to_string(),
+                    ValType::Vec,
+                    false,
+                )).id(),
+                ],
+            empty_out,
+            ass.load("nodes/project_tile.png"),
+            CyberNodes::Project,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "list: construct".to_string(),
+            "construct list out of all inputs, input lists will be flattened".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "a".to_string(),
+                    "first item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "b".to_string(),
+                    "second item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "c".to_string(),
+                    "third item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "d".to_string(),
+                    "fourth item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "e".to_string(),
+                    "fifth item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+            ],
+            cmd.spawn(PortMeta::new_meta(
+                "list".to_string(),
+                "1 dimentional list of all inputs".to_string(),
+                ValType::List,
+                false,
+            ))
+            .id(),
+            ass.load("nodes/list.png"),
+            CyberNodes::List,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "entity: closest".to_string(),
             "returns the closest nearby entity".to_string(),
             &[],
             cmd.spawn(PortMeta::new_meta(
@@ -133,7 +282,7 @@ fn spawn_shop(
             &mut mats,
         ),
         ItemMetaBundle::new(
-            "constant number".to_string(),
+            "number: constant".to_string(),
             "returns a constant number set in the port config".to_string(),
             &[],
             cmd.spawn(PortMeta::new_meta(
@@ -143,7 +292,300 @@ fn spawn_shop(
                 true,
             ))
             .id(),
-            ass.load("nodes/port_in.png"),
+            ass.load("nodes/const_number.png"),
+            CyberNodes::ConstantNumber,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "vector: multiply".to_string(),
+            "multilies an arbitrary amount of vectors".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "a".to_string(),
+                    "first vector".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "b".to_string(),
+                    "second vector".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "c".to_string(),
+                    "third vector".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "d".to_string(),
+                    "fourth vector".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "e".to_string(),
+                    "fifth vector".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id(),
+            ],
+            cmd.spawn(PortMeta::new_meta(
+                "vector".to_string(),
+                "a vector like: (ax * bx * cx ..., ay * by...)".to_string(),
+                ValType::Vec,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/vector_mul.png"),
+            CyberNodes::VectorMul,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "number: multiply".to_string(),
+            "multiplies an arbitrary amount of numbers together".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "a".to_string(),
+                    "first number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "b".to_string(),
+                    "second number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "c".to_string(),
+                    "third number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "d".to_string(),
+                    "fourth number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "e".to_string(),
+                    "fifth number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+            ],
+            cmd.spawn(PortMeta::new_meta(
+                "sum".to_string(),
+                "a * b * c * d * e".to_string(),
+                ValType::Number,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/multiply_number.png"),
+            CyberNodes::NumberMul,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "number: subtract".to_string(),
+            "subtracts an arbitrary amount of numbers in order of the input ports".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "a".to_string(),
+                    "first number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "b".to_string(),
+                    "second number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "c".to_string(),
+                    "third number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "d".to_string(),
+                    "fourth number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "e".to_string(),
+                    "fifth number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+            ],
+            cmd.spawn(PortMeta::new_meta(
+                "sum".to_string(),
+                "a - b - c - d - e".to_string(),
+                ValType::Number,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/subtract_number.png"),
+            CyberNodes::NumberSub,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "vector: create".to_string(),
+            "constructs a vector from 2 numbers".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "x".to_string(),
+                    "first number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "y".to_string(),
+                    "second number".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+            ],
+            cmd.spawn(PortMeta::new_meta(
+                "vector".to_string(),
+                "the constructed vector".to_string(),
+                ValType::Number,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/vector.png"),
+            CyberNodes::Vector,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "vector: negate".to_string(),
+            "negates a vector".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "vector".to_string(),
+                    "the vector to negate".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "vector".to_string(),
+                "the negated vector".to_string(),
+                ValType::Vec,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/vector_neg.png"),
+            CyberNodes::VectorNeg,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "vector: length".to_string(),
+            "computes the length / magnitude of a vector".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "vector".to_string(),
+                    "the vector to compute".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "length".to_string(),
+                "the length of the vector".to_string(),
+                ValType::Number,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/vector_length.png"),
+            CyberNodes::VectorLen,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "entity: nearby".to_string(),
+            "returns all nearby entities as a list of Entity".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "range".to_string(),
+                    "limit to the range. default is max: 10.".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "entities".to_string(),
+                "the nearby entities".to_string(),
+                ValType::List,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/all_entities.png"),
+            CyberNodes::NearbyEntities,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "entity: direction".to_string(),
+            "returns the direction the target entity is moving towards".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "target".to_string(),
+                    "target entity".to_string(),
+                    ValType::Entity,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "direction".to_string(),
+                "direction of the target".to_string(),
+                ValType::Vec,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/entity_dir.png"),
+            CyberNodes::EntityDirection,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "entity: position".to_string(),
+            "returns the target entities current position".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "target".to_string(),
+                    "target entity".to_string(),
+                    ValType::Entity,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "position".to_string(),
+                "position of target entity".to_string(),
+                ValType::Vec,
+                true,
+            ))
+            .id(),
+            ass.load("nodes/position.png"),
             CyberNodes::ConstantNumber,
             &mut mats,
         ),

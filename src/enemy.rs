@@ -15,7 +15,7 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_res).add_systems(
             Update,
-            (spawner, follow_path, draw_path, despawn).run_if(in_state(Gamestate::Game)),
+            (/*spawner,*/ follow_path, draw_path, despawn).run_if(in_state(Gamestate::Game)),
         );
     }
 }
