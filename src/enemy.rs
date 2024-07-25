@@ -19,7 +19,7 @@ impl Plugin for EnemyPlugin {
             FixedUpdate,
             (
                 spawner,
-                eat,
+                attack,
                 activity_transition,
                 follow_path,
                 scale_enemy,
@@ -126,7 +126,7 @@ fn draw_path(
     }
 }
 
-fn eat(
+fn attack(
     time: Res<Time>,
     mut health: Query<&mut Health>,
     mut ents: Query<(&mut EnemyActivity, &Dmg)>,
@@ -141,17 +141,18 @@ fn eat(
         };
 
         let Ok(mut hp) = health.get_mut(*e) else {
-            // prolly dead
+            warn!("tried attacking entity that no longer exists or has no hp");
             continue;
         };
 
         hp.0 -= dmg.0;
+        info!("attacking with {:?} dmg. new hp: {:?}", dmg.0, hp.0);
     }
 }
 
 fn scale_enemy(mut ents: Query<(&Health, &mut Dmg, &mut Transform)>) {
     for (hp, mut dmg, mut trans) in ents.iter_mut() {
-        dmg.0 = f32::min(hp.0 / 5., 10.);
+        dmg.0 = f32::max(hp.0 / 10., 1.);
         trans.scale = Vec2::splat(hp.0 / (MAX_HP / 5.)).extend(0.);
     }
 }
@@ -159,31 +160,17 @@ fn scale_enemy(mut ents: Query<(&Health, &mut Dmg, &mut Transform)>) {
 fn activity_transition(
     map: Res<Map>,
     tt: Query<&TileType>,
-    mut ents: Query<(&mut EnemyActivity, &Transform, &PathfindPath)>,
+    mut ents: Query<(&mut EnemyActivity, &Transform)>,
 ) {
-    for (mut activity, trans, path) in ents.iter_mut() {
-        let Some(next) = path.path.get(path.i) else {
-            // end of path
-            continue;
-        };
-
-        if map
-            .layout
-            .hex_to_world_pos(*next)
-            .distance(trans.translation.xy())
-            > 10.
-        {
-            *activity = EnemyActivity::Pathfinding;
-            continue;
-        }
-
-        let Some(ne) = map.storage.get(*next) else {
+    for (mut activity, trans) in ents.iter_mut() {
+        let pos = map.layout.world_pos_to_hex(trans.translation.xy());
+        let Some(ne) = map.storage.get(pos) else {
             continue;
         };
 
         let nt = tt.get(*ne).unwrap();
         if *nt == TileType::Unoccupied {
-            *activity = EnemyActivity::Pathfinding;
+            activity.set_if_neq(EnemyActivity::Pathfinding);
             continue;
         }
 
@@ -194,10 +181,12 @@ fn activity_transition(
             _ => unreachable!(),
         };
 
-        *activity =
-            EnemyActivity::Attacking(*e, Timer::new(Duration::from_secs(1), TimerMode::Repeating));
-        //let mut hp = health.get_mut(*e).unwrap();
-        //hp.0 -= dmg.0;
+        if !matches!(activity.as_ref(), EnemyActivity::Attacking(..)) {
+            *activity = EnemyActivity::Attacking(
+                *e,
+                Timer::new(Duration::from_secs(1), TimerMode::Repeating),
+            );
+        }
     }
 }
 
@@ -212,7 +201,7 @@ fn spawner(
 ) {
     for t in ticks.read() {
         // 1/5 chance to spawn enemy
-        if !rand::thread_rng().gen_bool(1. / 10.) {
+        if !rand::thread_rng().gen_bool(1. / 3.) {
             continue;
         }
 

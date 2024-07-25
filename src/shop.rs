@@ -652,6 +652,7 @@ fn spawn_shop(
         // title
         root.spawn(NodeBundle {
             style: Style {
+                display: Display::Flex,
                 flex_direction: FlexDirection::Row,
                 ..default()
             },
@@ -671,9 +672,11 @@ fn spawn_shop(
         // main area
         root.spawn(NodeBundle {
             style: Style {
-                //height: Val::Auto,
-                //width: Val::Auto,
+                height: Val::Auto,
+                width: Val::Auto,
                 flex_grow: 1.,
+                display: Display::Flex,
+                flex_direction: FlexDirection::Row,
                 ..default()
             },
             ..default()
@@ -681,36 +684,60 @@ fn spawn_shop(
         .with_children(|main| {
             main.spawn(NodeBundle {
                 style: Style {
-                    position_type: PositionType::Absolute,
-                    width: Val::Percent(100.),
                     height: Val::Auto,
-                    max_height: Val::Percent(100.),
-                    aspect_ratio: Some(1.),
+                    width: Val::Percent(80.),
+                    display: Display::Flex,
                     ..default()
                 },
                 ..default()
             })
-            .with_children(|intermediate| {
-                let tiles: Vec<Entity> = storage.iter().flatten().copied().collect();
-                intermediate
-                    .spawn((
-                        NodeBundle {
-                            style: Style {
-                                position_type: PositionType::Absolute,
-                                width: Val::Auto,
-                                height: Val::Percent(100.),
-                                aspect_ratio: Some(1.),
+            .with_children(|left| {
+                left.spawn(NodeBundle {
+                    style: Style {
+                        position_type: PositionType::Absolute,
+                        width: Val::Percent(100.),
+                        height: Val::Auto,
+                        max_height: Val::Percent(100.),
+                        aspect_ratio: Some(1.),
+                        ..default()
+                    },
+                    ..default()
+                })
+                .with_children(|intermediate| {
+                    let tiles: Vec<Entity> = storage.iter().flatten().copied().collect();
+                    intermediate
+                        .spawn((
+                            NodeBundle {
+                                style: Style {
+                                    position_type: PositionType::Absolute,
+                                    width: Val::Auto,
+                                    height: Val::Percent(100.),
+                                    aspect_ratio: Some(1.),
+                                    ..default()
+                                },
                                 ..default()
                             },
-                            ..default()
-                        },
-                        ShopGrid,
-                        ShopLayout(layout),
-                        ShopSelection::default(),
-                        RelativeCursorPosition::default(),
-                        ShopItems(storage),
-                    ))
-                    .push_children(&tiles);
+                            ShopGrid,
+                            ShopLayout(layout),
+                            ShopSelection::default(),
+                            RelativeCursorPosition::default(),
+                            ShopItems(storage),
+                        ))
+                        .push_children(&tiles);
+                });
+            });
+
+            main.spawn(NodeBundle {
+                style: Style {
+                    height: Val::Percent(100.),
+                    width: Val::Auto,
+                    min_width: Val::Percent(20.),
+                    flex_grow: 1.,
+                    //width: Val::Percent(20.),
+                    //left: Val::Percent(60.),
+                    ..default()
+                },
+                ..default()
             });
         });
     });

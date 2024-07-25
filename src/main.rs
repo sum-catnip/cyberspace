@@ -281,8 +281,14 @@ fn heal_heart(
     }
 }
 
-fn destroy_nodes(mut cmd: Commands, mut tiles: Query<&mut TileType>, hp: Query<&Health>) {
-    for mut tt in tiles.iter_mut() {
+fn destroy_nodes(
+    mut cmd: Commands,
+    mut tiles: Query<(Entity, &mut TileType)>,
+    hp: Query<&Health>,
+    mut mats: Query<&mut Handle<ColorMaterial>>,
+    common: Res<CommonResources>,
+) {
+    for (te, mut tt) in tiles.iter_mut() {
         let e = *match tt.as_ref() {
             TileType::CyberNode { e, .. } => e,
             TileType::Heart(e) => e,
@@ -299,6 +305,7 @@ fn destroy_nodes(mut cmd: Commands, mut tiles: Query<&mut TileType>, hp: Query<&
         if hp.0 <= 0. {
             cmd.entity(e).despawn_recursive();
             *tt = TileType::Unoccupied;
+            *mats.get_mut(te).unwrap() = common.unoccupied_mat.clone();
         }
     }
 }
@@ -449,7 +456,7 @@ fn tile_purchased(
                         state: CyberState::Idle,
                         pos: HexPos(item.tile),
                     },
-                    Health(50.),
+                    Health(10.),
                 ))
                 .id(),
         };
