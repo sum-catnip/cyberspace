@@ -9,7 +9,7 @@ use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
     nodes::{Health, HexPos, TargetableEntity},
-    Gamestate, Map, Tick, TileType,
+    Debug, Gamestate, Map, Tick, TileType,
 };
 
 pub struct EnemyPlugin;
@@ -103,7 +103,15 @@ fn follow_path(
     }
 }
 
-fn draw_path(mut gizmos: Gizmos, map: Res<Map>, mut ents: Query<(&Transform, &PathfindPath)>) {
+fn draw_path(
+    mut gizmos: Gizmos,
+    dbg: Res<Debug>,
+    map: Res<Map>,
+    mut ents: Query<(&Transform, &PathfindPath)>,
+) {
+    if !dbg.enemy_paths {
+        return;
+    };
     for (trans, path) in ents.iter_mut() {
         gizmos.circle_2d(trans.translation.xy(), 10., Color::from(RED));
         if let Some(next) = path.path.get(path.i) {

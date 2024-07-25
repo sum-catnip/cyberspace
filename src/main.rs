@@ -85,6 +85,7 @@ struct Debug {
     mouse_shop_logical: Vec2,
     mouse_shop_tile: IVec2,
     gui_outline: bool,
+    enemy_paths: bool,
 }
 
 #[derive(Resource, Default)]
