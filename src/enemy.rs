@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{
     color::palettes::css::{BLUE, GREEN, RED},
     prelude::*,
@@ -14,14 +16,26 @@ pub struct EnemyPlugin;
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_res).add_systems(
-            Update,
-            (/*spawner,*/ follow_path, draw_path, despawn).run_if(in_state(Gamestate::Game)),
+            FixedUpdate,
+            (
+                spawner,
+                eat,
+                activity_transition,
+                follow_path,
+                scale_enemy,
+                draw_path,
+                despawn,
+            )
+                .run_if(in_state(Gamestate::Game)),
         );
     }
 }
 
 #[derive(Component)]
 struct PathfindTarget(Entity);
+
+#[derive(Component)]
+struct Dmg(f32);
 
 #[derive(Component)]
 struct PathfindPath {
@@ -37,19 +51,22 @@ struct EnemyBundle {
     activity: EnemyActivity,
     targetable: TargetableEntity,
     health: Health,
+    dmg: Dmg,
 }
 
 #[derive(Component, Default, PartialEq)]
 enum EnemyActivity {
     #[default]
     Pathfinding,
-    Attacking,
+    Attacking(Entity, Timer),
 }
 
 #[derive(Resource)]
 struct EnemyRes {
     ball: Handle<Image>,
 }
+
+const MAX_HP: f32 = 500.;
 
 fn load_res(mut cmd: Commands, ass: Res<AssetServer>) {
     cmd.insert_resource(EnemyRes {
@@ -101,6 +118,81 @@ fn draw_path(mut gizmos: Gizmos, map: Res<Map>, mut ents: Query<(&Transform, &Pa
     }
 }
 
+fn eat(
+    time: Res<Time>,
+    mut health: Query<&mut Health>,
+    mut ents: Query<(&mut EnemyActivity, &Dmg)>,
+) {
+    for (mut activity, dmg) in ents.iter_mut() {
+        let EnemyActivity::Attacking(e, t) = activity.as_mut() else {
+            continue;
+        };
+
+        if !t.tick(time.delta()).just_finished() {
+            continue;
+        };
+
+        let Ok(mut hp) = health.get_mut(*e) else {
+            // prolly dead
+            continue;
+        };
+
+        hp.0 -= dmg.0;
+    }
+}
+
+fn scale_enemy(mut ents: Query<(&Health, &mut Dmg, &mut Transform)>) {
+    for (hp, mut dmg, mut trans) in ents.iter_mut() {
+        dmg.0 = f32::min(hp.0 / 5., 10.);
+        trans.scale = Vec2::splat(hp.0 / (MAX_HP / 5.)).extend(0.);
+    }
+}
+
+fn activity_transition(
+    map: Res<Map>,
+    tt: Query<&TileType>,
+    mut ents: Query<(&mut EnemyActivity, &Transform, &PathfindPath)>,
+) {
+    for (mut activity, trans, path) in ents.iter_mut() {
+        let Some(next) = path.path.get(path.i) else {
+            // end of path
+            continue;
+        };
+
+        if map
+            .layout
+            .hex_to_world_pos(*next)
+            .distance(trans.translation.xy())
+            > 10.
+        {
+            *activity = EnemyActivity::Pathfinding;
+            continue;
+        }
+
+        let Some(ne) = map.storage.get(*next) else {
+            continue;
+        };
+
+        let nt = tt.get(*ne).unwrap();
+        if *nt == TileType::Unoccupied {
+            *activity = EnemyActivity::Pathfinding;
+            continue;
+        }
+
+        let e = match nt {
+            TileType::CyberNode { e, .. } => e,
+            TileType::Terrain(e) => e,
+            TileType::Heart(e) => e,
+            _ => unreachable!(),
+        };
+
+        *activity =
+            EnemyActivity::Attacking(*e, Timer::new(Duration::from_secs(1), TimerMode::Repeating));
+        //let mut hp = health.get_mut(*e).unwrap();
+        //hp.0 -= dmg.0;
+    }
+}
+
 // spawn in radius around hearts
 fn spawner(
     mut cmd: Commands,
@@ -132,7 +224,7 @@ fn spawner(
             match t2 {
                 TileType::Unoccupied => Some(0),
                 TileType::Heart(_) => Some(1),
-                TileType::Terrain => Some(10),
+                TileType::Terrain(_) => Some(10),
                 TileType::CyberNode { .. } => Some(50),
             }
         }) else {
@@ -150,7 +242,8 @@ fn spawner(
             path: PathfindPath { path, i: 0 },
             activity: EnemyActivity::default(),
             targetable: TargetableEntity,
-            health: Health(42.),
+            health: Health(rng.gen_range(10..MAX_HP as u32) as f32),
+            dmg: Dmg(10.),
         });
     }
 }

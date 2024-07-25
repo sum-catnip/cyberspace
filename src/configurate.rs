@@ -73,6 +73,7 @@ fn grid_pick(
             continue;
         };
 
+        // todo middle hex to clear
         let tile_hex = tile_hex.neighbor_direction(Hex::ZERO).unwrap();
 
         let mut cfg = portcfg.get_mut(grid.0).expect("node without portcfg");

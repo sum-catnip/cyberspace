@@ -57,7 +57,7 @@ pub enum Val {
 pub struct TargetableEntity;
 
 #[derive(Component)]
-pub struct Health(pub f64);
+pub struct Health(pub f32);
 
 #[derive(Component)]
 pub struct MetaLink(pub Entity);
@@ -263,7 +263,7 @@ fn lazor_tick(
     metas: Query<&PortMeta>,
     mut targets: Query<&mut Health, With<TargetableEntity>>,
 ) {
-    const DMG: f64 = 10.;
+    const DMG: f32 = 10.;
     for e in evt.read() {
         info!("ticking lazor");
         let Ok((pos, cfg)) = node.get(e.e) else {
@@ -309,9 +309,8 @@ fn closest_tick(
         info!("ticking get closest entity");
         let (mut state, hpos) = state.get_mut(tick.e).unwrap();
         let e = targets.iter().find_map(|(e, trans)| {
-            let pos = map.layout.hex_to_world_pos(hpos.0);
-            let dist = (trans.translation.xy() - pos).length();
-            (dist <= 25.).then_some(e)
+            let pos = map.layout.world_pos_to_hex(trans.translation.xy());
+            (pos.distance_to(hpos.0) <= 5).then_some(e)
         });
 
         *state = match e {

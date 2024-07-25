@@ -8,9 +8,9 @@ use std::time::Duration;
 use enemy::EnemyPlugin;
 use nodes::{
     ClosestEntity, ConstantNumber, CyberNodes, CyberPlugin, CyberState, EntityDirection, EntityPos,
-    HexPos, Lazor, List, MetaLink, NearbyEntity, NodeBundle, NumberMul, NumberSub, Orbital, Plasma,
-    PortCfg, PortMetas, Project, RocketLauncher, Shock, TickNode, Vector, VectorLen, VectorMul,
-    VectorNeg,
+    Health, HexPos, Lazor, List, MetaLink, NearbyEntity, NodeBundle, NumberMul, NumberSub, Orbital,
+    Plasma, PortCfg, PortMetas, Project, RocketLauncher, Shock, TickNode, Vector, VectorLen,
+    VectorMul, VectorNeg,
 };
 use shop::PickedItem;
 use ui::UIPlugin;
@@ -18,12 +18,14 @@ use ui::UIPlugin;
 use bevy::{
     color::palettes::css::{GREEN, RED},
     core_pipeline::bloom::BloomSettings,
+    input::mouse::{MouseScrollUnit, MouseWheel},
     prelude::*,
     render::{
         mesh::{Indices, PrimitiveTopology},
         render_asset::RenderAssetUsages,
     },
     sprite::{MaterialMesh2dBundle, Mesh2dHandle},
+    window::PrimaryWindow,
 };
 use bevy_inspector_egui::{prelude::*, quick::ResourceInspectorPlugin};
 use hexx::{storage::HexagonalMap, Hex, HexLayout, PlaneMeshBuilder};
@@ -48,6 +50,9 @@ fn main() {
                 heartbeat,
                 tick_nodes,
                 request_nodes,
+                destroy_nodes,
+                zoom_scale,
+                heal_heart,
             )
                 .run_if(in_state(Gamestate::Game)),
         )
@@ -98,6 +103,9 @@ struct TileClicked {
 #[derive(Event)]
 struct Tick(Entity);
 
+#[derive(Resource)]
+struct HealTimer(Timer);
+
 #[derive(Resource, Default)]
 pub struct ShoppingForTile(Option<Hex>);
 
@@ -129,7 +137,7 @@ impl Map {
 enum TileType {
     #[default]
     Unoccupied,
-    Terrain,
+    Terrain(Entity),
     Heart(Entity),
     CyberNode {
         meta: Entity,
@@ -144,6 +152,7 @@ struct Heartbeat(Timer);
 struct HeartBundle {
     beat: Heartbeat,
     tile: HexPos,
+    hp: Health,
 }
 
 type TileApperance = MaterialMesh2dBundle<ColorMaterial>;
@@ -203,14 +212,17 @@ fn setup(
         heart_mat: heart_mat.clone(),
     });
 
-    let rad = 3;
+    cmd.insert_resource(HealTimer(Timer::from_seconds(10., TimerMode::Repeating)));
+
+    let rad = 10;
     let storage = HexagonalMap::new(Hex::ZERO, rad, |t| {
         let worldpos = layout.hex_to_world_pos(t);
         let id = if t == Hex::ZERO {
             let e = cmd
                 .spawn(HeartBundle {
-                    beat: Heartbeat(Timer::new(Duration::from_secs(1), TimerMode::Repeating)),
+                    beat: Heartbeat(Timer::new(Duration::from_secs(10), TimerMode::Repeating)),
                     tile: HexPos(t),
+                    hp: Health(10.),
                 })
                 .id();
             cmd.spawn(HexTile {
@@ -242,14 +254,65 @@ fn setup(
     cmd.insert_resource(Map { layout, storage })
 }
 
+fn zoom_scale(
+    mut whl: EventReader<MouseWheel>,
+    mut cam: Query<&mut OrthographicProjection, With<MainCamera>>,
+) {
+    let delta_zoom: f32 = whl.read().map(|e| e.y).sum();
+    if delta_zoom == 0. {
+        return;
+    }
+
+    let mut projection = cam.single_mut();
+    let wanted_zoom = projection.scale - delta_zoom * 0.6;
+    projection.scale = wanted_zoom.clamp(1., 10.);
+}
+
+fn heal_heart(
+    mut q: Query<&mut Health, With<Heartbeat>>,
+    mut timer: ResMut<HealTimer>,
+    time: Res<Time>,
+) {
+    for mut hp in q.iter_mut() {
+        if timer.0.tick(time.delta()).just_finished() {
+            hp.0 += 1.;
+        }
+    }
+}
+
+fn destroy_nodes(mut cmd: Commands, mut tiles: Query<&mut TileType>, hp: Query<&Health>) {
+    for mut tt in tiles.iter_mut() {
+        let e = *match tt.as_ref() {
+            TileType::CyberNode { e, .. } => e,
+            TileType::Heart(e) => e,
+            TileType::Terrain(e) => e,
+            TileType::Unoccupied => {
+                continue;
+            }
+        };
+
+        let Ok(hp) = hp.get(e) else {
+            continue;
+        };
+
+        if hp.0 <= 0. {
+            cmd.entity(e).despawn_recursive();
+            *tt = TileType::Unoccupied;
+        }
+    }
+}
+
 fn heartbeat(
-    mut hearts: Query<(Entity, &mut Heartbeat)>,
+    mut hearts: Query<(Entity, &mut Heartbeat, &Health)>,
     time: Res<Time>,
     mut tick: EventWriter<Tick>,
 ) {
-    for (e, mut beat) in hearts.iter_mut() {
-        if beat.0.tick(time.delta()).finished() {
+    for (e, mut beat, hp) in hearts.iter_mut() {
+        if beat.0.tick(time.delta()).just_finished() {
             tick.send(Tick(e));
+            info!("tick event sent");
+            // readjust timer
+            beat.0.set_duration(Duration::from_secs_f32(100. / hp.0));
         }
     }
 }
@@ -378,12 +441,15 @@ fn tile_purchased(
         *tt = TileType::CyberNode {
             meta: item.item,
             e: cmd
-                .spawn(NodeBundle {
-                    meta: MetaLink(item.item),
-                    cfg: PortCfg::default(),
-                    state: CyberState::Idle,
-                    pos: HexPos(item.tile),
-                })
+                .spawn((
+                    NodeBundle {
+                        meta: MetaLink(item.item),
+                        cfg: PortCfg::default(),
+                        state: CyberState::Idle,
+                        pos: HexPos(item.tile),
+                    },
+                    Health(50.),
+                ))
                 .id(),
         };
     }
