@@ -1,5 +1,4 @@
 use core::panic;
-use std::f64::NAN;
 
 use bevy::{
     color::palettes::css::BLACK,
@@ -10,7 +9,6 @@ use bevy::{
     math::vec2,
     prelude::*,
     ui::RelativeCursorPosition,
-    utils::warn,
 };
 use hexx::{storage::HexagonalMap, Hex, HexLayout};
 
@@ -69,12 +67,10 @@ fn grid_pick(
         let Some(tile_hex) = selection.tile else {
             continue;
         };
+        debug!("clicked tile {:?} in cfg", tile_hex);
         let Some(tile_ent) = selection.ui else {
             continue;
         };
-
-        // todo middle hex to clear
-        let tile_hex = tile_hex.neighbor_direction(Hex::ZERO).unwrap();
 
         let mut cfg = portcfg.get_mut(grid.0).expect("node without portcfg");
         if let Some(h) = cfg
@@ -87,23 +83,29 @@ fn grid_pick(
             cfg.inputs.remove(&h);
         }
 
-        if cfg.inputs.get(&tile_hex).is_some() {
-            warn!("tile already taken");
-            continue;
-        }
-        cfg.inputs.insert(tile_hex, meta.0);
-
         // lets reset all tiles lol
         for e in tiles.0.iter().flatten().copied() {
             img.get_mut(e).unwrap().texture = common.blank_img.clone();
         }
 
+        // middle hex to clear
+        if tile_hex == Hex::ZERO {
+            continue;
+        };
+        debug!("clicked tile {:?} in cfg", tile_hex);
+
+        if cfg.inputs.get(&tile_hex).is_some() {
+            warn!("tile already taken");
+            continue;
+        }
+        cfg.inputs.insert(tile_hex, meta.0);
         img.get_mut(tile_ent).unwrap().texture = common.port_in.clone();
     }
 }
 
 fn grid_select(
     layout: Query<&CfgUi>,
+    mut dbg: ResMut<crate::Debug>,
     mut grids: Query<(
         &Node,
         &mut GridSelection,
@@ -125,9 +127,12 @@ fn grid_select(
 
         let Some(rel) = rel.normalized else { continue };
         // denormalize and center cursor pos
-        let pos = size * rel - half;
+        let mut pos = size * rel - half;
+        pos.y = -pos.y;
+        dbg.mouse_cfg_logical = pos;
 
         let tile = layout.0.world_pos_to_hex(pos);
+        dbg.mouse_cfg_tile = tile.into();
         if !items.0.bounds().is_in_bounds(tile) {
             return;
         };
@@ -199,14 +204,26 @@ fn spawn_output_row(
 fn spawn_input_row(
     cmd: &mut Commands,
     metas: &Query<&PortMeta>,
+    cfg: &PortCfg,
     meta_ent: Entity,
     res: &CommonResources,
     node: Entity,
     layout: &HexLayout,
 ) -> Entity {
+    let current = cfg
+        .inputs
+        .iter()
+        .find(|(_, e)| **e == meta_ent)
+        .map(|(d, _)| *d);
+
     let size = vec2(150., 150.);
     let half_size = size / 2.;
     let tiles = HexagonalMap::new(Hex::ZERO, 1, |h| {
+        let mut img = res.blank_img.clone();
+        if current == Some(h) {
+            img = res.port_in.clone();
+        }
+
         let pos = layout.hex_to_world_pos(h);
         let ts = layout.rect_size();
         let hts = ts / 2.;
@@ -215,12 +232,12 @@ fn spawn_input_row(
                 position_type: PositionType::Absolute,
                 width: Val::Px(ts.x),
                 height: Val::Px(ts.y),
-                top: Val::Px(pos.y + half_size.y - hts.y),
+                top: Val::Px(-pos.y + half_size.y - hts.y),
                 left: Val::Px(pos.x + half_size.x - hts.x),
                 margin: UiRect::all(Val::Px(2.)),
                 ..default()
             },
-            image: UiImage::new(res.blank_img.clone()),
+            image: UiImage::new(img),
             ..default()
         })
         .id()
@@ -319,7 +336,10 @@ fn update_constant(
             ValType::Number => {
                 let mut v = 0.;
                 if !text.sections[0].value.is_empty() {
-                    v = text.sections[0].value.parse::<f64>().unwrap_or(NAN);
+                    v = text.sections[0].value.parse::<f32>().unwrap_or(f32::NAN);
+                    if text.sections[0].value == "-" {
+                        v = -0.;
+                    }
                     if v.is_nan() {
                         text.sections[0].value = "NaN".to_string();
                     }
@@ -369,7 +389,7 @@ fn build_ui(
     let in_rows: Vec<Entity> = inputs
         .0
         .iter()
-        .map(|e| spawn_input_row(&mut cmd, &metas, *e, &res, node, &layout))
+        .map(|e| spawn_input_row(&mut cmd, &metas, &cfg, *e, &res, node, &layout))
         .collect();
     let out_text = cmd
         .spawn(TextBundle::from_section(

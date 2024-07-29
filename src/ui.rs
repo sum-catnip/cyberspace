@@ -1,4 +1,6 @@
-use crate::{configurate::ConfiguratePlugin, shop::ShopPlugin, Debug};
+use crate::{
+    configurate::ConfiguratePlugin, death::DeathPlugin, hud::HudPlugin, shop::ShopPlugin, Debug,
+};
 use bevy::{
     dev_tools::ui_debug_overlay::{DebugUiPlugin, UiDebugOptions},
     prelude::*,
@@ -11,6 +13,8 @@ impl Plugin for UIPlugin {
             .add_systems(Update, sync_ui_outlines)
             .add_plugins(DebugUiPlugin)
             .add_plugins(ShopPlugin)
+            .add_plugins(HudPlugin)
+            .add_plugins(DeathPlugin)
             .add_plugins(ConfiguratePlugin);
     }
 }

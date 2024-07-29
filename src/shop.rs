@@ -1,11 +1,10 @@
-use crate::nodes::{CyberNodes, ItemMetaBundle, PortMeta, ValType};
+use crate::nodes::{
+    CyberNodes, Description, ItemMeta, ItemMetaBundle, Name, OutputPort, PortMeta, PortMetas,
+    ValType,
+};
 use crate::{ui::UIRoot, Debug};
 use crate::{Gamestate, ShoppingForTile};
-use bevy::{
-    color::palettes::css::BLACK,
-    prelude::*,
-    ui::{ui_layout_system, RelativeCursorPosition},
-};
+use bevy::{color::palettes::css::BLACK, prelude::*, ui::RelativeCursorPosition};
 use hexx::{shapes, storage::HexagonalMap, Hex, HexLayout};
 
 pub struct ShopPlugin;
@@ -14,8 +13,13 @@ impl Plugin for ShopPlugin {
         app.add_systems(Startup, spawn_shop)
             .add_systems(
                 Update,
-                (align_grid, leave_shop, grid_selection, pick_grid)
-                    .after(ui_layout_system)
+                (
+                    align_grid,
+                    leave_shop,
+                    grid_selection,
+                    pick_grid,
+                    update_description,
+                )
                     .run_if(in_state(Gamestate::Shop)),
             )
             .add_event::<PickedItem>()
@@ -32,6 +36,9 @@ pub struct PickedItem {
 
 #[derive(Resource)]
 struct ShopUINode(Entity);
+
+#[derive(Component)]
+struct ItemDescription;
 
 #[derive(Component)]
 struct ShopTile;
@@ -216,6 +223,51 @@ fn spawn_shop(
             &mut mats,
         ),
         ItemMetaBundle::new(
+            "debug".to_string(),
+            "log all inputs to the console".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "a".to_string(),
+                    "first item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "b".to_string(),
+                    "second item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "c".to_string(),
+                    "third item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "d".to_string(),
+                    "fourth item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "e".to_string(),
+                    "fifth item".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+            ],
+            empty_out,
+            ass.load("nodes/debug.png"),
+            CyberNodes::Debug,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
             "list: construct".to_string(),
             "construct list out of all inputs, input lists will be flattened".to_string(),
             &[
@@ -340,7 +392,7 @@ fn spawn_shop(
                 "vector".to_string(),
                 "a vector like: (ax * bx * cx ..., ay * by...)".to_string(),
                 ValType::Vec,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/vector_mul.png"),
@@ -391,7 +443,7 @@ fn spawn_shop(
                 "sum".to_string(),
                 "a * b * c * d * e".to_string(),
                 ValType::Number,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/multiply_number.png"),
@@ -442,11 +494,62 @@ fn spawn_shop(
                 "sum".to_string(),
                 "a - b - c - d - e".to_string(),
                 ValType::Number,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/subtract_number.png"),
             CyberNodes::NumberSub,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "store".to_string(),
+            "unimplemented, sorry :(".to_string(),
+            &[
+                cmd.spawn(PortMeta::new_meta(
+                    "0".to_string(),
+                    "data slot 0".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "1".to_string(),
+                    "data slot 1".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "2".to_string(),
+                    "data slot 2".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "3".to_string(),
+                    "data slot 3".to_string(),
+                    ValType::Any,
+                    false,
+                ))
+                .id(),
+                cmd.spawn(PortMeta::new_meta(
+                    "slot".to_string(),
+                    "determines the slot to output. default is 0".to_string(),
+                    ValType::Number,
+                    false,
+                ))
+                .id(),
+            ],
+            cmd.spawn(PortMeta::new_meta(
+                "data".to_string(),
+                "the stored data from the slot `slot`".to_string(),
+                ValType::Any,
+                false,
+            ))
+            .id(),
+            ass.load("nodes/storage.png"),
+            CyberNodes::Storage,
             &mut mats,
         ),
         ItemMetaBundle::new(
@@ -472,7 +575,7 @@ fn spawn_shop(
                 "vector".to_string(),
                 "the constructed vector".to_string(),
                 ValType::Number,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/vector.png"),
@@ -494,11 +597,33 @@ fn spawn_shop(
                 "vector".to_string(),
                 "the negated vector".to_string(),
                 ValType::Vec,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/vector_neg.png"),
             CyberNodes::VectorNeg,
+            &mut mats,
+        ),
+        ItemMetaBundle::new(
+            "list: len".to_string(),
+            "returns the length of a list".to_string(),
+            &[cmd
+                .spawn(PortMeta::new_meta(
+                    "list".to_string(),
+                    "list input".to_string(),
+                    ValType::Vec,
+                    false,
+                ))
+                .id()],
+            cmd.spawn(PortMeta::new_meta(
+                "length".to_string(),
+                "the number of elements in the list".to_string(),
+                ValType::Vec,
+                false,
+            ))
+            .id(),
+            ass.load("nodes/listlen.png"),
+            CyberNodes::ListLength,
             &mut mats,
         ),
         ItemMetaBundle::new(
@@ -516,7 +641,7 @@ fn spawn_shop(
                 "length".to_string(),
                 "the length of the vector".to_string(),
                 ValType::Number,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/vector_length.png"),
@@ -538,7 +663,7 @@ fn spawn_shop(
                 "entities".to_string(),
                 "the nearby entities".to_string(),
                 ValType::List,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/all_entities.png"),
@@ -560,7 +685,7 @@ fn spawn_shop(
                 "direction".to_string(),
                 "direction of the target".to_string(),
                 ValType::Vec,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/entity_dir.png"),
@@ -582,11 +707,11 @@ fn spawn_shop(
                 "position".to_string(),
                 "position of target entity".to_string(),
                 ValType::Vec,
-                true,
+                false,
             ))
             .id(),
             ass.load("nodes/position.png"),
-            CyberNodes::ConstantNumber,
+            CyberNodes::EntityPos,
             &mut mats,
         ),
     ]
@@ -662,7 +787,7 @@ fn spawn_shop(
             titlebox.spawn(TextBundle::from_section(
                 "Shop",
                 TextStyle {
-                    font: ass.load("fonts/Exwayer-X3eqa.ttf"),
+                    font: ass.load("fonts/Geist-Regular.ttf"),
                     font_size: 62.,
                     ..default()
                 },
@@ -684,9 +809,11 @@ fn spawn_shop(
         .with_children(|main| {
             main.spawn(NodeBundle {
                 style: Style {
-                    height: Val::Auto,
-                    width: Val::Percent(80.),
+                    height: Val::Percent(100.),
+                    width: Val::Auto,
+                    aspect_ratio: Some(1.),
                     display: Display::Flex,
+                    flex_shrink: 1.,
                     ..default()
                 },
                 ..default()
@@ -698,6 +825,7 @@ fn spawn_shop(
                         width: Val::Percent(100.),
                         height: Val::Auto,
                         max_height: Val::Percent(100.),
+                        flex_shrink: 0.,
                         aspect_ratio: Some(1.),
                         ..default()
                     },
@@ -713,6 +841,7 @@ fn spawn_shop(
                                     width: Val::Auto,
                                     height: Val::Percent(100.),
                                     aspect_ratio: Some(1.),
+                                    flex_shrink: 0.,
                                     ..default()
                                 },
                                 ..default()
@@ -732,12 +861,18 @@ fn spawn_shop(
                     height: Val::Percent(100.),
                     width: Val::Auto,
                     min_width: Val::Percent(20.),
-                    flex_grow: 1.,
-                    //width: Val::Percent(20.),
-                    //left: Val::Percent(60.),
+                    flex_wrap: FlexWrap::Wrap,
+                    flex_basis: Val::Percent(20.),
+                    max_width: Val::Auto,
                     ..default()
                 },
                 ..default()
+            })
+            .with_children(|info| {
+                info.spawn((
+                    TextBundle::from_section("", TextStyle::default()),
+                    ItemDescription,
+                ));
             });
         });
     });
@@ -781,6 +916,67 @@ fn grid_selection(
         };
         selection.node = Some(*items.0.get(tile).unwrap());
         selection.tile = Some(tile);
+    }
+}
+
+fn update_description(
+    shop: Query<&ShopSelection>,
+    mut desc: Query<&mut Text, With<ItemDescription>>,
+    items: Query<(&Name, &Description, &PortMetas, &OutputPort), With<ItemMeta>>,
+    ports: Query<&PortMeta>,
+) {
+    for selection in shop.iter() {
+        let Some(node) = selection.node else { continue };
+        let mut text = desc.single_mut();
+        let (name, desc, pms, opm) = items.get(node).unwrap();
+
+        let style = TextStyle::default();
+        text.sections = vec![
+            TextSection::new(&name.0, style.clone()),
+            TextSection::new("\n", style.clone()),
+            TextSection::new(&desc.0, style.clone()),
+            TextSection::new("\n\n", style.clone()),
+            TextSection::new("input ports\n", style.clone()),
+        ];
+
+        for pme in pms.0.iter() {
+            let pm = ports.get(*pme).unwrap();
+            text.sections
+                .push(TextSection::new("name: ", style.clone()));
+            text.sections
+                .push(TextSection::new(&pm.name, style.clone()));
+            text.sections.push(TextSection::new("\n", style.clone()));
+            text.sections
+                .push(TextSection::new("desc: ", style.clone()));
+            text.sections
+                .push(TextSection::new(&pm.desc, style.clone()));
+            text.sections.push(TextSection::new("\n", style.clone()));
+            text.sections
+                .push(TextSection::new("type: ", style.clone()));
+            text.sections
+                .push(TextSection::new(pm.vt.to_string(), style.clone()));
+            text.sections.push(TextSection::new("\n", style.clone()));
+            text.sections.push(TextSection::new("\n", style.clone()));
+        }
+
+        text.sections
+            .push(TextSection::new("output port\n", style.clone()));
+
+        let pm = ports.get(opm.0).unwrap();
+        text.sections
+            .push(TextSection::new("name: ", style.clone()));
+        text.sections
+            .push(TextSection::new(&pm.name, style.clone()));
+        text.sections.push(TextSection::new("\n", style.clone()));
+        text.sections
+            .push(TextSection::new("desc: ", style.clone()));
+        text.sections
+            .push(TextSection::new(&pm.desc, style.clone()));
+        text.sections.push(TextSection::new("\n", style.clone()));
+        text.sections
+            .push(TextSection::new("type: ", style.clone()));
+        text.sections
+            .push(TextSection::new(pm.vt.to_string(), style.clone()));
     }
 }
 

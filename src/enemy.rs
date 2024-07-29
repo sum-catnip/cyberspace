@@ -9,7 +9,7 @@ use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
     nodes::{Health, HexPos, TargetableEntity},
-    Debug, Gamestate, Map, Tick, TileType,
+    CommonResources, Debug, Gamestate, Map, Tick, TileType,
 };
 
 pub struct EnemyPlugin;
@@ -38,9 +38,9 @@ struct PathfindTarget(Entity);
 struct Dmg(f32);
 
 #[derive(Component)]
-struct PathfindPath {
-    path: Vec<Hex>,
-    i: usize,
+pub struct PathfindPath {
+    pub path: Vec<Hex>,
+    pub i: usize,
 }
 
 #[derive(Bundle)]
@@ -127,7 +127,9 @@ fn draw_path(
 }
 
 fn attack(
+    mut cmd: Commands,
     time: Res<Time>,
+    common: Res<CommonResources>,
     mut health: Query<&mut Health>,
     mut ents: Query<(&mut EnemyActivity, &Dmg)>,
 ) {
@@ -147,13 +149,17 @@ fn attack(
 
         hp.0 -= dmg.0;
         info!("attacking with {:?} dmg. new hp: {:?}", dmg.0, hp.0);
+        cmd.spawn(AudioBundle {
+            source: common.dmg_sound.clone(),
+            ..default()
+        });
     }
 }
 
 fn scale_enemy(mut ents: Query<(&Health, &mut Dmg, &mut Transform)>) {
     for (hp, mut dmg, mut trans) in ents.iter_mut() {
         dmg.0 = f32::max(hp.0 / 10., 1.);
-        trans.scale = Vec2::splat(hp.0 / (MAX_HP / 5.)).extend(0.);
+        trans.scale = Vec2::splat(hp.0 / MAX_HP / 2.).extend(0.);
     }
 }
 
@@ -200,7 +206,7 @@ fn spawner(
     hearts: Query<&HexPos>,
 ) {
     for t in ticks.read() {
-        // 1/5 chance to spawn enemy
+        // 1/3 chance to spawn enemy
         if !rand::thread_rng().gen_bool(1. / 3.) {
             continue;
         }
@@ -231,8 +237,13 @@ fn spawner(
 
         cmd.spawn(EnemyBundle {
             apperance: SpriteBundle {
+                sprite: Sprite {
+                    color: Color::srgb(5., 1., 1.),
+                    ..default()
+                },
                 texture: res.ball.clone(),
-                transform: Transform::from_translation(spawnpos.extend(1.)),
+                transform: Transform::from_translation(spawnpos.extend(1.))
+                    .with_scale(Vec3::splat(0.)),
                 ..default()
             },
             target: PathfindTarget(t.0),
